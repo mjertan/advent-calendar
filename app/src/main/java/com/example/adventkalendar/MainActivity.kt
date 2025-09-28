@@ -49,7 +49,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.LocalDate
@@ -59,6 +61,7 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
+import androidx.compose.runtime.mutableLongStateOf
 
 // DataStore
 val Context.dataStore by preferencesDataStore(name = "settings_prefs")
@@ -255,7 +258,7 @@ fun CountdownCard(modifier: Modifier = Modifier) {
         ) {
             when (mode) {
                 CounterMode.FULL -> {
-                    BigText("${days} days")
+                    BigText("$days days")
                     SmallRow("$hours hours, $minutes minutes", "$seconds seconds")
                 }
                 CounterMode.NIGHTS -> {
@@ -357,10 +360,7 @@ fun SettingsScreen() {
         ListItem(
             headlineContent = { Text("Change background image") },
             supportingContent = { Text("Choose from Gallery") },
-            leadingContent = {
-                // ikona je 24dp — neće više "razvući" red
-                Icon(imageVector = Icons.Filled.Image, contentDescription = null)
-            },
+            leadingContent = { Icon(imageVector = Icons.Filled.Image, contentDescription = null) },
             modifier = Modifier
                 .clip(RoundedCornerShape(12.dp))
                 .clickable { launchGallery() }
@@ -444,8 +444,8 @@ private data class Snowflake(
 @Composable
 private fun SnowfallLayer(daysRemaining: Long, modifier: Modifier = Modifier) {
     val flakes = remember { mutableStateListOf<Snowflake>() }
-    var lastTime by remember { mutableStateOf(0L) }
-    var frameTime by remember { mutableStateOf(0L) }
+    var lastTime by remember { mutableLongStateOf(0L) }
+    var frameTime by remember { mutableLongStateOf(0L) }
 
     val targetCount = remember(daysRemaining) { targetFlakeCount(daysRemaining) }
 
@@ -464,7 +464,7 @@ private fun SnowfallLayer(daysRemaining: Long, modifier: Modifier = Modifier) {
 
         if (flakes.size < targetCount) {
             repeat((targetCount - flakes.size).coerceAtMost(6)) {
-                flakes += randomFlake(width = w, startAbove = true)
+                flakes += randomFlake(width = w)
             }
         } else if (flakes.size > targetCount) {
             repeat((flakes.size - targetCount).coerceAtMost(6)) {
@@ -482,7 +482,7 @@ private fun SnowfallLayer(daysRemaining: Long, modifier: Modifier = Modifier) {
 
         flakes.removeAll { it.y - it.radius > h }
         while (flakes.size < targetCount) {
-            flakes += randomFlake(width = w, startAbove = true)
+            flakes += randomFlake(width = w)
         }
 
         val alphaFactor = when {
@@ -506,12 +506,12 @@ private fun targetFlakeCount(daysRemaining: Long): Int = when {
 }.coerceAtMost(140)
 
 // veličinu podešavaš gore kroz SNOW_SIZE_MULTIPLIER i min/max
-private fun randomFlake(width: Float, startAbove: Boolean): Snowflake {
+private fun randomFlake(width: Float): Snowflake {
     val r = Random.Default
     val minR = SNOW_MIN_RADIUS_BASE * SNOW_SIZE_MULTIPLIER
     val maxR = SNOW_MAX_RADIUS_BASE * SNOW_SIZE_MULTIPLIER
     val radius = r.nextFloat() * (maxR - minR) + minR
-    val startY = if (startAbove) -r.nextFloat() * 200f else r.nextFloat() * 100f
+    val startY = -r.nextFloat() * 200f // uvijek kreće iznad ekrana
 
     return Snowflake(
         x = r.nextFloat() * width,
@@ -573,8 +573,8 @@ private fun DrawScope.branch(
 }
 
 /** Kopira odabranu sliku u internu memoriju app-a i vraća file:// URI. */
-private suspend fun saveBackgroundImageToInternal(ctx: Context, sourceUri: Uri): Uri? {
-    return try {
+private suspend fun saveBackgroundImageToInternal(ctx: Context, sourceUri: Uri): Uri? = withContext(Dispatchers.IO) {
+    try {
         val file = java.io.File(ctx.filesDir, "wallpaper.jpg")
         ctx.contentResolver.openInputStream(sourceUri).use { inStream ->
             if (inStream != null) {
