@@ -206,7 +206,7 @@ fun HomeScreen() {
         CountdownCard(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 40.dp, start = 16.dp, end = 16.dp)
+                .padding(top = 41.dp, start = 16.dp, end = 16.dp)
         )
     }
 }
